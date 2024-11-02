@@ -30,11 +30,6 @@ STR_URL_AZURE_FILES = "file.core.windows.net"
 ## PRE-RUN CHECK FUNCTIONS
 #########################
 
-def check_arguments(arguments):
-    if len(arguments) < 2:
-        print_usage(arguments[0])
-        exit()
-
 # Check that entered subdomain is valid based on number of '.'
 def check_subdomain_valid(subdomain):
     if subdomain.count('.') < 2:
@@ -49,8 +44,6 @@ def check_type_cname(subdomain):
         answer = str(dns.resolver.resolve(subdomain, dns.rdatatype.CNAME)[0])[:-1]
         return answer
     except:
-        print(f"Record for subdomain {subdomain} does not exist or is not of CNAME type.")
-        print(f"If you believe this is an error, please check your internet connection. An internet connection is required to test subdomains.")
         return False
 
 ######################################################################
@@ -126,10 +119,13 @@ async def check_vulnerable_azure_files(answer):
 #########################
 
 def print_usage(filename):
-    print(f"\nUsage: python3 {filename} <subdomain>\n"
+    print(f"\nUsage: python3 {filename} <subdomain>\n\n"
           f"  or : python3 {filename} -f <zone-file-name> <root-domain>\n"
           f"       example: python3 {filename} -f domain.zone example.com\n"
-          f"\nZone file must be in BIND-compatible format\n")
+          f"       note: Zone file must be in BIND-compatible format.\n\n"
+          f"  or : python3 {filename} -c <root-domain> <wordlist-file-name>\n"
+          f"       example: python3 {filename} -c example.com wordlist.txt\n"
+          f"       note: Each word in the wordlist should be separated by a newline character.\n")
 
 def print_domain_does_not_exist(domain):
     print(STR_IDNT_1 + f"Target domain {domain} does not exist")
@@ -156,11 +152,42 @@ def parse_dns_zone_file(filepath, root_domain):
     return subdomains
 
 ######################################################################
+## AUTOMATIC SUBDOMAIN CRAWLING
+#########################
+
+# Create a list of subdomains which are CNAME records
+def crawl_subdomains(domain, wordlist):
+    subdomains = []
+
+    try:
+        with open(wordlist, "r") as words:
+            for word in words:
+                word = word.strip()
+                subdomain = word + "." + domain
+                print(f"\rChecking subdomain {subdomain}", end='')
+
+                if check_type_cname(subdomain) == False:
+                    print(f"\t\tInvalid")
+                    continue
+                else:
+                    print(f"\t\tValid")
+                    subdomains.append(subdomain)
+
+    except:
+        print(f"Wordlist file could not be read. Exiting program...")
+        exit()
+
+    print(f"Discovered {len(subdomains)} subdomain(s) of CNAME type for {domain} based on wordlist\n")
+
+    return subdomains
+
+
+######################################################################
 ## MAIN FUNCTIONS
 #########################
 
 # Check all subdomains in the list
-def check_subdomains(subdomains):
+def test_subdomains_list(subdomains):
     for subdomain in subdomains:
         if check_subdomain_valid(subdomain) == False:
             continue
@@ -168,7 +195,8 @@ def check_subdomains(subdomains):
         answer = check_type_cname(subdomain)
 
         if answer == False:
-            print(f"\n")
+            print(f"Record for subdomain {subdomain} does not exist or is not of CNAME type.")
+            print(f"If you believe this is an error, please check your internet connection. An internet connection is required to test subdomains.\n")
             continue
         else:
             print(f"Analysing subdomain {subdomain}...")
@@ -203,15 +231,36 @@ def check_subdomains(subdomains):
             else:
                 print(Back.YELLOW + f"{subdomain} may be vulnerable to a subdomain takeover attack. Please check that the service is still active."  + Style.RESET_ALL + "\n\n")
 
-# Python Main
-check_arguments(sys.argv) 
+######################################################################
+## Python Main Section
+#########################
 
+# Check that number of arguments before accessing them
+if len(sys.argv) < 2:
+    print_usage(sys.argv[0])
+    exit()
+
+# Use DNS zone file as subdomain list
 if sys.argv[1] == "-f":
     if len(sys.argv) != 4:
         print_usage(sys.argv[0])
         exit()
     
-    check_subdomains(parse_dns_zone_file(sys.argv[2], sys.argv[3]))
+    test_subdomains_list(parse_dns_zone_file(sys.argv[2], sys.argv[3]))
 
+# Discover subdomains automatically using wordlist
+elif sys.argv[1] == "-c":
+    if len(sys.argv) == 4:
+        subdomains = crawl_subdomains(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 3:
+        print(f"No wordlist file specified. Using default provided wordlist for subdomain crawling...")
+        subdomains = crawl_subdomains(sys.argv[2], "subdomainlist-default.txt")
+    else:
+        print_usage(sys.argv[0])
+        exit()
+    
+    test_subdomains_list(subdomains)
+
+# Check provided subdomains from arguments
 else:
-    check_subdomains(sys.argv[1:])
+    test_subdomains_list(sys.argv[1:])

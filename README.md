@@ -29,12 +29,22 @@ python3 subdomain-takeover-tool.py <subdomain 1> <subdomain 2> <subdomain 3>
 python3 subdomain-takeover-tool.py example1.example.com example2.example.com example3.example.com
 
 # Testing the entire domain with a DNS zone file
-python3 subdomain-takeover-tool.py -f <DNS zone filename> <domain name>
+python3 subdomain-takeover-tool.py -f <DNS zone filename> <root domain>
 # Example:
 python3 subdomain-takeover-tool.py -f domain.zone example.com
+
+# Automatically discover and test subdomains based on a wordlist
+# Please note that this may not be a comprehensive crawl and some subdomains may be missed
+# Specifying a wordlist filename is optional. The provided wordlist will be used by default if no wordlist filename is specified
+python3 subdomain-takeover-tool.py -c <root domain> <wordlist filename>
+# Example:
+python3 subdomain-takeover-tool.py -c example.com wordlist.txt
 ```
 
 ## Supported services
 The following services currently have specific tests to give accurate vulnerability status results.
 * [GitHub Pages](https://pages.github.com/)
 * [Azure Files](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-introduction)
+
+## Credits
+* The wordlist in this repository was taken from [rbsec](https://github.com/rbsec)'s 500 most common subdomains which can be viewed in their [dnscan repository](https://github.com/rbsec/dnscan). More common subdomain lists are also available in their repository.
