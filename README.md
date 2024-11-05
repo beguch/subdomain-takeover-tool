@@ -13,6 +13,9 @@ source .venv/bin/activate
 
 # Install the external libraries with pip
 pip install aiohttp dnspython colorama
+
+# Exit the Python virtual environment
+deactivate
 ```
 
 ## Usage
